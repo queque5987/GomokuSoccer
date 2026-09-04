@@ -8,6 +8,7 @@
 class UTextureRenderTarget2D;
 
 DECLARE_DELEGATE_FourParams(FCalculateCompleted, int32/*Flick DollIndex*/, FVector/*Flick Direction*/, FVector/*Place Location*/, UObject*/*Next Player*/)
+DECLARE_DELEGATE_OneParam(FOnDebugDoll, const FStoneDebugData&/*bOccupied*/)
 
 USTRUCT(BlueprintType)
 struct FGoBoardConfig
@@ -37,6 +38,7 @@ public:
 	TArray<FStreakDollContainer> UF_CloseEnemy;
 	TArray<TArray<FGridData>> Grid_Occupied;
 	TArray<FStoneData> BoardStat;
+	TArray<FStoneDebugData> DebugDataArr;
 };
 
 //USTRUCT(BlueprintType)
@@ -222,6 +224,19 @@ public:
 };
 
 USTRUCT(BlueprintType)
+struct FStoneDebugData
+{
+	GENERATED_BODY()
+	FStoneDebugData() {};
+	FStoneDebugData(
+		FVector InLocation, bool InbOccupied
+	) : Location(InLocation), bOccupied(InbOccupied) {};
+public:
+	FVector Location;
+	bool bOccupied;
+};
+
+USTRUCT(BlueprintType)
 struct FStoneData
 {
 	GENERATED_BODY()
@@ -267,6 +282,7 @@ class GOSOCCER_API UGoSoccerAISubsystem : public UWorldSubsystem
 	UPROPERTY()
 	UObject* AWaitPlayer;
 
+	FOnDebugDoll OnDebugDoll;
 	FCalculateCompleted CalculateCompleted;
 	//UPROPERTY()
 	//TArray<FStoneData> BoardStat;

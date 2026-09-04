@@ -2,7 +2,7 @@
 #include "GameFramework/GameModeBase.h"
 #include "GoSoccerPlayManager.h"
 
-constexpr float GRID_MINIMUM_DISTANCE_THRESHOLD = 6.5f;
+constexpr float GRID_MINIMUM_DISTANCE_THRESHOLD = 20.f;//6.5f;
 constexpr float GRID_MAXIMUM_DISTANCE_THRESHOLD = 8.f;
 constexpr float AI_STREAK_SCORE_WEIGHT = 12.f;
 constexpr float PLAYER_STREAK_SCORE_WEIGHT = 10.f;
@@ -24,7 +24,15 @@ void UGoSoccerAISubsystem::Request_Calculate(
         CalculateCompleted.Unbind();
         CalculateCompleted.BindUFunction(this, FName("Calculate_Completed"));
     }
-
+    if (!OnDebugDoll.IsBound() || !OnDebugDoll.IsBoundToObject(this))
+    {
+        OnDebugDoll.Unbind();
+        OnDebugDoll.BindLambda([&](const FStoneDebugData& DebugDat)->void
+            {
+                DrawDebugSphere(GetWorld(), DebugDat.Location, 5.f, 32, DebugDat.bOccupied ? FColor::Red : FColor::Green, false, 3.f);
+            }
+        );
+    }
     double StartTime = FPlatformTime::Seconds();
 
     AWaitPlayer = WaitPlayer;
@@ -65,7 +73,7 @@ void UGoSoccerAISubsystem::Request_Calculate(
 
     AsyncTask(
         ENamedThreads::AnyBackgroundThreadNormalTask,
-        [GoBoardContext = MoveTemp(GoBoardConfig), WaitPlayer, InCalculateCompleted = CalculateCompleted]() mutable
+        [GoBoardContext = MoveTemp(GoBoardConfig), WaitPlayer, InCalculateCompleted = CalculateCompleted, InOnDebugDoll = OnDebugDoll]() mutable
         {
             EvaluateBoard_WriteStreakData(GoBoardContext);
             //double EvaluageBoard_Time = FPlatformTime::Seconds();
@@ -78,6 +86,17 @@ void UGoSoccerAISubsystem::Request_Calculate(
             Notify_PlaceLocation_Calculated(FlickDollIdx, FlickDirection, PlaceLocation, GoBoardContext);
             //double AIPlayCalculate_Time = FPlatformTime::Seconds();
             //UE_LOG(LogTemp, Log, TEXT("4/4 - AIPlay_Calculated - Took : %.2f ms"), (AIPlayCalculate_Time - EvaluageBoard_Time) * 1000.f);
+            
+#if UE_EDITOR
+            AsyncTask(ENamedThreads::GameThread, [GoBoardContext, InOnDebugDoll]()
+                {
+                    for (const auto& Iter : GoBoardContext.DebugDataArr)
+                    {
+                        InOnDebugDoll.ExecuteIfBound(Iter);
+                    }
+                }
+            );
+#endif
             AsyncTask(ENamedThreads::GameThread, [FlickDollIdx, FlickDirection, PlaceLocation, WaitPlayer, InCalculateCompleted]()
                 {
                     InCalculateCompleted.ExecuteIfBound(FlickDollIdx, FlickDirection, PlaceLocation, WaitPlayer);
@@ -99,7 +118,11 @@ void UGoSoccerAISubsystem::Calculate_Completed(int32 FlickDollIdx, FVector Flick
 {
     UE_LOG(
         LogTemp, Log,
-        TEXT("FlickDollIdx : %d, FlickDirection : %s, PlaceLocation : %s"),
+        TEXT("===== Calculate_Completed =====")
+    );
+    UE_LOG(
+        LogTemp, Log,
+        TEXT("Calculate_Completed : FlickDollIdx : %d, FlickDirection : %s, PlaceLocation : %s"),
         FlickDollIdx, *FlickDirection.ToString(), *PlaceLocation.ToString()
     );
     //UGoSoccerPlayManager::AIPlay_ThrowLoadingScreen(NextPlayer, false);
@@ -780,6 +803,20 @@ void UGoSoccerAISubsystem::EvaluateBoard_GridStreakTrailsToScore(
             uint8 DollIdx = GoBoardConfig.Grid_Occupied[X][Y].ClosestStoneIdx;
             //Grid_Occupied[X][Y].
             bool bIsOccupied = DollIdx >= 0 && GoBoardConfig.Grid_Occupied[X][Y].StoneDistance <= GRID_MINIMUM_DISTANCE_THRESHOLD;
+#if UE_EDITOR
+            float StepX = (GoBoardConfig.R - GoBoardConfig.L) / (BOARD_GRID_SIZE - 1);
+            float StepY = (GoBoardConfig.D - GoBoardConfig.U) / (BOARD_GRID_SIZE - 1);
+            FVector DrawDebugCenterLoc = FVector(
+                GoBoardConfig.L + X * StepX,
+                GoBoardConfig.U + Y * StepY,
+                BOARD_LOCATION_Z_AXIS + 5.f
+            );
+            if (bIsOccupied)
+            {
+                GoBoardConfig.DebugDataArr.Emplace(DrawDebugCenterLoc, bIsOccupied);
+            }
+#endif
+
             bool bHasDoll = DollIdx >= 0;
             bool bContainAIDoll = (1ULL << GoBoardConfig.AIDollColor) & GoBoardConfig.Grid_Occupied[X][Y].ContainDollColor;
         // To Flick Doll Params
@@ -833,9 +870,17 @@ void UGoSoccerAISubsystem::EvaluateBoard_GridStreakTrailsToScore(
                 }
                 if (bContainPlayerDoll)
                 { // Flick To This Grid ?
-                    if (Iter.StreakRadian == GoBoardConfig.AIDollColor) // Still This Grid
+                    if (Iter.StreakRadian == GoBoardConfig.AIDollColor) // Steal This Grid
                     {
                         LocationValueForPlayer += StreakValue * TipWeight;
+                        if (!bIsTipOccupied_0 && !bIsTipOccupied_1) // Open Both Tip Side
+                        {
+                            LocationValueForPlayer *= 15.f;
+                        }
+                        else if (!bIsTipOccupied_0 || !bIsTipOccupied_1) // Least On Tip Siee Open
+                        {
+                            LocationValueForPlayer *= 1.5f;
+                        }
                     }
                     else
                     {

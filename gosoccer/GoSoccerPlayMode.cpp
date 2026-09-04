@@ -410,7 +410,10 @@ bool AGoSoccerPlayMode::TurnStart_Implementation(APlayerController* Player)
 			AITurnStart(Player);
 			return true;
 		}
-		AIPlayingTurn = !AIPlayingTurn;
+		else
+		{
+			AIPlayingTurn = !AIPlayingTurn;
+		}
 	}
 	else 
 	{
@@ -833,9 +836,9 @@ bool AGoSoccerPlayMode::AIPlay_SpawnDollAtLocation_Implementation(UObject* NextP
 {
 	// Thudo
 	// Try Random Locations
+	AIPlayingTurn = false;
 	Execute_SpawnDoll(this, NextPlayerObject, PlaceLocation, ((uint8)1 ^ AIGame_PlayerDollColor), EDollType::EDT_Default);
 	APlayerController* tempPC = Cast<APlayerController>(NextPlayerObject);
-	AIPlayingTurn = false;
 	//UGoSoccerPlayManager::AIPlay_ConsiderTurnPassed(NextPlayerObject);
 	//Execute_WinCheck(this, tempPC);
 	return NextPlayerObject != nullptr;
