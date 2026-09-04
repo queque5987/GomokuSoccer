@@ -1,0 +1,2 @@
+#include "GameFramework/GoSoccerGameUserSettings.h"
+
