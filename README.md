@@ -13,31 +13,36 @@ Steam 정식 출시를 목표로 개발 중인 1인 프로젝트입니다.
 
 # 사용한 기술
 
-## **1. Steam OSS 기반 P2P 멀티플레이 구현**
+## [**1. Steam OSS 기반 P2P 멀티플레이 구현**](#1-steam-oss-기반-p2p-멀티플레이-구현)
 * **Steamworks SDK** : 플레이어간 세션 생성, 검색, 참여 기능을 구현하였습니다.
 * **RPC** : 각 돌들의 위치를 Replicate하고, 이펙트와 사운드 재생 그리고 스코어 업데이트 등의 기능을 구현하며 서버와 클라이언트를 동기화하였습니다.
 
-## **2. 멀티스레딩 & 좌표 기반 Min-Max 알고리즘 구현**
+## [**2. 멀티스레딩 & 좌표 기반 Min-Max 알고리즘 구현**](#2-멀티스레딩--좌표-기반-min-max-알고리즘-구현)
 * **기존 Min-Max 알고리즘 확장** : 기존 271개 비트를 사용하는 Min-Max 알고리즘을 확장하여 바둑판의 그리드 방식이 아닌 좌표계에서도 활용할 수 있는 알고리즘을 구현하였습니다.
 * **멀티스레드** : 바둑돌의 위치를 구하는 기능이 백그라운드 스레드에서 동작하도록 구현하였습니다.
 * **Calude 활용** : 1차원적으로 바둑판의 상태를 평가하고, 바둑돌을 소환하거나 튕길 돌과 방향 벡터를 산출하는 알고리즘을 기반으로 특정 depth까지 계산하는 알고리즘을 완성하였습니다.
 
-## **3. 머티리얼 기반 UI 구현**
+## [**3. 머티리얼 기반 UI 구현**](#3-머티리얼-기반-ui-구현)
 * **MID를 통한 UI 연출** : 다이나믹 머티리얼 인스턴스의 파라미터를 C++ 및 Blueprint에서 조정하여 UI 애니메이션을 구현하였습니다.
 * **Material UI** : 버튼 및 HUD 등 모든 위젯을 머티리얼을 활용하여 구현하였습니다.
 
-## **4. 확장성을 고려한 객체 지향적 구조**
+## [**4. 확장성을 고려한 객체 지향적 구조**](#4-확장성을-고려한-객체-지향적-구조)
 * **컴파일 시간 최소화** : 인터페이스의 의존성을 정적인 클래스에 몰아두어 각 클래스 간 함수 호출을 자유롭게 하고, 순환 참조를 방지, 컴파일 시간을 단축시켰습니다.
 
 ---
 
-## **1. Steam OSS 기반 P2P 멀티플레이 구현**
-컴파일된 5.2 버전 엔진 사용
-Steam SDK 1.53 사용
-OnlineSubsystem 인터페이스를 사용하여 세션 생성, 검색, 참가, 초대 기능을 구현
-Session관련 파라미터는 Enum과 구조체를 선언하여 관리
-해당 구조체와 Enum을 통해 세션을 표시하는 위젯, 로비에서 세션 설정을 바꾸는 위젯 등에서 활용할 수 있도록 확장성 확보
+# 자세히
 
+## **1. Steam OSS 기반 P2P 멀티플레이 구현**
+
+OnlineSubsystem 인터페이스를 사용하여 세션 생성, 검색, 참가, 초대 기능을 구현하였습니다.
+
+Session관련 파라미터는 Enum과 구조체를 선언하여 관리하였습니다.
+
+<details>
+<summary>Session 파라미터를 저장하는 구조체</summary>
+
+**Session 생성 및 게임 실행 시 규칙 등 기능적인 부분에서 사용하는 구조체*
 ```cpp
 USTRUCT(BlueprintType)
 struct FSessionCreateData
@@ -84,6 +89,186 @@ public:
 	bool bEnableItem = false;
 };
 ```
+
+**Session 리스트 관련 기능에서 사용하는 구조체*
+```cpp
+USTRUCT(BlueprintType)
+struct FSessionDisplayData
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly)
+	FString ServerName;
+
+	UPROPERTY(BlueprintReadOnly)
+	FString HostName;
+
+	UPROPERTY(BlueprintReadOnly)
+	int32 CurrentPlayers;
+
+	UPROPERTY(BlueprintReadOnly)
+	int32 MaxPlayers;
+
+	UPROPERTY(BlueprintReadOnly)
+	int32 Ping;
+
+	UPROPERTY(BlueprintReadOnly)
+	FBlueprintSessionResult RawResult;
+
+	UPROPERTY(BlueprintReadOnly)
+	EPlayGameRule PlayGameRule;
+};
+```
+
+</details>
+
+해당 구조체와 Enum을 통해 세션을 표시하는 위젯, 로비에서 세션 설정을 바꾸는 위젯 등에서 활용할 수 있도록 확장성을 고려하여 구현하였습니다.
+
+<details>
+<summary>Session 검색 코드</summary>
+
+**세션 검색 및 Delegate 호출*
+
+```cpp
+void UGoSoccerGameInstance::OnFindSessionComplete(bool bWasSuccessful)
+{
+	IOnlineSubsystem* OnlineSubsystem = IOnlineSubsystem::Get();
+	if (OnlineSubsystem == nullptr)
+	{
+#if !UE_BUILD_SHIPPING
+		if (GEngine)
+		{
+			FString LogString = FString::Printf(TEXT("Subsystem Not Found"));
+			GEngine->AddOnScreenDebugMessage(-1, 3.f, bWasSuccessful ? FColor::Red : FColor::Red, LogString);
+		}
+#endif
+		return;
+	}
+	FString CurrentSubsystem = OnlineSubsystem->GetSubsystemName().ToString();
+
+	if (!OnlineSessionInterface.IsValid() || !bWasSuccessful || SessionSearch == nullptr)
+	{
+#if !UE_BUILD_SHIPPING
+		if (GEngine)
+		{
+			FString LogString = FString::Printf(TEXT("Session Not Found (Subsystem : %s)"), *CurrentSubsystem);
+			GEngine->AddOnScreenDebugMessage(-1, 3.f, bWasSuccessful ? FColor::Red : FColor::Red, LogString);
+		}
+#endif
+		return;
+	}
+	TArray<FSessionDisplayData> SearchSessionResults;
+
+#if !UE_BUILD_SHIPPING
+	if (GEngine)
+	{
+		FString LogString = FString::Printf(TEXT("SearchResults Start"));
+		GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Green, LogString);
+	}
+#endif
+
+	for (auto Result : SessionSearch->SearchResults)
+	{
+		FString ID = Result.Session.GetSessionIdStr();
+		FString User = Result.Session.OwningUserName;
+
+		FString SessionName;
+		FString HostName;
+		int PlayGameRule;
+		Result.Session.SessionSettings.Get(Key_SessionName, SessionName);
+		Result.Session.SessionSettings.Get(Key_HostName, HostName);
+		SessionName = DecodeSessionText(SessionName);
+		HostName = DecodeSessionText(HostName);
+		Result.Session.SessionSettings.Get(Key_PlayGameRule, PlayGameRule);
+
+#if !UE_BUILD_SHIPPING
+		if (GEngine)
+		{
+			FString LogString = FString::Printf(
+				TEXT("Session ID : %s, Host : %s, SessionName : %s, PlayRule : %d, IsValid: %s, Ping: %d"),
+				*ID,
+				*HostName,
+				*SessionName,
+				PlayGameRule,
+				Result.IsValid() ? TEXT("True") : TEXT("False"),
+				Result.PingInMs
+			);
+			GEngine->AddOnScreenDebugMessage(-1, 3.f, Result.IsValid() ? FColor::Green : FColor::Red, LogString);
+		}
+#endif
+		FSessionDisplayData SessionDisplayData;
+		FBlueprintSessionResult BlueprintSessionResult;
+		BlueprintSessionResult.OnlineResult = Result;
+
+		SessionDisplayData.RawResult = BlueprintSessionResult;
+		SessionDisplayData.ServerName = SessionName;
+		SessionDisplayData.Ping = Result.PingInMs;
+		SessionDisplayData.MaxPlayers = Result.Session.SessionSettings.NumPublicConnections;
+		SessionDisplayData.CurrentPlayers = SessionDisplayData.MaxPlayers - Result.Session.NumOpenPublicConnections;
+		SessionDisplayData.HostName = HostName;
+		SessionDisplayData.PlayGameRule = (PlayGameRule == 1 ? EPlayGameRule::EPGR_5or5Mode : EPlayGameRule::EPGR_5plus5Mode);
+		SearchSessionResults.Emplace(SessionDisplayData);
+		
+		//OnlineSessionInterface->JoinSession(0, NAME_GameSession, Result);
+	}
+
+#if !UE_BUILD_SHIPPING
+	if (GEngine)
+	{
+		FString LogString = FString::Printf(TEXT("SearchResults End"));
+		GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Green, LogString);
+	}
+#endif
+	Delegate_OnUpdateOnlineSessionList.Broadcast(SearchSessionResults);
+}
+```
+
+**Delegate_OnUpdateOnlineSessionList에 바인딩된 Callback함수*
+
+```cpp
+void UMainWidget::Callback_OnUpdateOnlineSessionList(const TArray<FSessionDisplayData>& OnlineSessionDataArr)
+{
+	Callback_OnClearOnlineSessionList();
+	for (const auto& Iter : OnlineSessionDataArr)
+	{
+#if !UE_BUILD_SHIPPING
+		if (GEngine)
+		{
+			FString LogString = FString::Printf(
+				TEXT("Session Name : %s"), *Iter.ServerName
+			);
+			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Green, LogString);
+		}
+#endif
+		//AddOnlineSessionSearchResult(Iter.RawResult.OnlineResult);
+		UGameSessionData* GameSessionData = NewObject<UGameSessionData>(GetOwningLocalPlayer());
+		if (GameSessionData == nullptr) return;
+		GameSessionData->SetSessionName(Iter.ServerName);
+		GameSessionData->SetOnlineSessionSearchResult(Iter.RawResult.OnlineResult);
+		GameSessionData->SetSessionDisplayData(Iter);
+		ListView_SessionList->AddItem(GameSessionData);
+	}
+}
+```
+
+</details>
+
+<details>
+<summary>Session 리스트를 표시하는 ListView의 EntryWidgetClass</summary>
+
+**BP_Session의 OnListItemObjectSet 노드*
+
+<img width="1368" height="384" alt="image" src="https://github.com/user-attachments/assets/d0acd836-c275-4d38-bb30-e9a4335fe55f" />
+
+**BP_Session*
+
+<img width="779" height="103" alt="image" src="https://github.com/user-attachments/assets/e46ad9be-d85e-4a2f-a57e-cd5566980c67" />
+
+**MainWidget의 ListView*
+
+<img width="755" height="505" alt="image" src="https://github.com/user-attachments/assets/9b1a7d20-9e63-4179-8b72-bfda7adac52a" />
+
+</details>
 
 ## **2. 멀티스레딩 & 좌표 기반 Min-Max 알고리즘 구현**
 
@@ -1081,8 +1266,6 @@ void UGoSoccerAISubsystem::EvaluateBoard_GridStreakTrailsToScore(
 * 기존 코드를 활용하여 2이상의 Depth를 탐색하는 코드로 확장하도록 하였습니다.
 <details>
 <summary>사용된 프롬프트</summary>
-  
-  ---
 
 # 1. 코드 파악 / 기능별 정리
 
@@ -1160,24 +1343,356 @@ void UGoSoccerAISubsystem::EvaluateBoard_GridStreakTrailsToScore(
 
 ## **3. 머티리얼 기반 UI 구현**
 
-<img width="474" height="227" alt="image" src="https://github.com/user-attachments/assets/b3f1569a-e9e8-4939-99d7-da19ed633429" />
-
-<img width="1040" height="577" alt="image" src="https://github.com/user-attachments/assets/f99f7c2a-5e1f-4976-ae18-a0bad8ba4be6" />
 
 메인 위젯의 플로우는 Enum을 활용하여 c++ 스크립트에서 변경, 블루프린트에서 애니메이션을 재생하는 방식으로 구현하였습니다.
 
+<details>
+<summary>위젯의 상태를 변경하는 코드</summary>
+
+```cpp
+void AGoPlayerController::Client_SetMainUIState_Implementation(const EMainUIState& NewMainUIState)
+{
+	if (Widget_Main == nullptr || Widget_HUD == nullptr) return;
+	Widget_Main->OnUIStateChanged(NewMainUIState);
+	Widget_HUD->OnUIStateChanged(NewMainUIState);
+	if (NewMainUIState == EMainUIState::EMUIS_InLobby)
+	{
+		Client_SwitchBGM(SB_BGM_InGame);
+		Client_SetCameraPosition(ECameraPosition::ECP_Lobby);
+	}
+	else if (NewMainUIState == EMainUIState::EMUIS_GameConfigSetting)
+	{
+		Client_SetCameraPosition(ECameraPosition::ECP_Session);
+	}
+}
+```
+
+</details>
+<details>
+<summary>BP_Main의 위젯 및 이벤트 노드</summary>
+
+**BP_Main의 전체 패널*
+
+<img width="474" height="227" alt="image" src="https://github.com/user-attachments/assets/b3f1569a-e9e8-4939-99d7-da19ed633429" />
+
+**OnUIStateChanged에 바인드된 이벤트*
+
+<img width="1040" height="577" alt="image" src="https://github.com/user-attachments/assets/f99f7c2a-5e1f-4976-ae18-a0bad8ba4be6" />
+
+</details>
+
 Check_*UI*와 Out_*UI* 파라미터를 통해 각 패널의 체크 여부와, 목표 Visibility를 전달하는 방식을 사용하였습니다. (예: Setting Panel로 진입 시 다른 패널은 체크할 필요 없이 Setting Panel의 Visiblity만 체크하면 됨)
+
+<details>
+<summary>BP_Main의 SetPanelVisibility 노드</summary>
+
+**모든 패널에 대해 Check_*UI* Out_*UI*검사*
+<img width="1404" height="542" alt="image" src="https://github.com/user-attachments/assets/2ab5a9cf-ecbf-4b91-b41d-f7a1c18478b7" />
+
+**패널 Visibility 검사 예시*
+<img width="1173" height="486" alt="image" src="https://github.com/user-attachments/assets/50b038b2-6818-4436-a0e8-09a1f31d780b" />
+
+**위젯 Visibility 변경 매크로*
+<img width="1479" height="448" alt="image" src="https://github.com/user-attachments/assets/79e1c1e0-088c-42dd-a167-1bf52e5eb231" />
+
+</details>
 
 c++ 클래스를 상속한 블루프린트 위젯에서 Material Instance Dynamic(MID)을 생성, 지정하였습니다.
 
+<details>
+<summary>BP_MatchScore의 MID 생성 및 설정 노드</summary>
+	
+<img width="1572" height="425" alt="image" src="https://github.com/user-attachments/assets/69bec401-b7ac-4ec5-b320-090482c6e19f" />
+
+</details>
+
 위젯의 애니메이션은 Blueprint Implementable Event 매크로를 적용한 함수를 호출하여 MID의 파라미터를 조정하는 방식으로 구현하였습니다.
+
+사용된 위젯은 저작권 없는 이미지를 활용하여 머티리얼을 통해 구현하였고 일부분은 [이전 프로젝트](https://github.com/queque5987/Arcane-Crusader#1-7-3-%EB%AC%B4%EA%B8%B0-%EC%8A%A4%EC%9C%84%EC%B9%AD-UI)에서 구현하였던 블루프린트 위젯을 재활용하였습니다.
+
 
 ## **4. 확장성을 고려한 객체 지향적 구조**
 
 static 클래스 GoSoccerPlayManager를 구현하여 각 클래스별 함수 호출을 자유롭게 하였습니다.
 
+<details>
+<summary>GoSoccerPlayManager</summary>
+
+```cpp
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Kismet/BlueprintFunctionLibrary.h"
+#include "GameFramework/GoSoccer_PCH.h"
+#include "GoSoccerPlayManager.generated.h"
+
+UCLASS()
+class GOSOCCER_API UGoSoccerPlayManager : public UBlueprintFunctionLibrary
+{
+	GENERATED_BODY()
+	
+
+public:
+// Object Type Check
+	static bool IsGoBoard(UObject* CheckObject);
+	static bool IsGoDoll(UObject* CheckObject);
+	/* Also Check Is Doll Fallen */
+	static bool IsDollFallen(UObject* BoardObject, UObject* DollObject);
+	static bool GetDollFallFromBoard(UObject* DollObject, bool& bIsFallen);
+	static bool GetDollColor(UObject* DollObject, uint8& OutDollColor);
+	static bool GetGoBoardBorderLine(UObject* BoardObject, float& U, float& D, float& L, float& R);
+	static bool IsDollConsideredStationary(UObject* DollObject);
+
+// Game Play Controll
+	static bool GameStarted(UObject* PlayerObject, const FSessionCreateData& SessionCreateData);
+	static FVector GetPutLocation(UObject* BoardObject, FVector CursorLocation);
+	static bool PutDoll(UObject* GameModeObject, UObject* PlayerControllerObject, FVector Location, uint8 DollColor, const EDollType& SpawnDollType);
+	static bool SetDollPlacedIndex(UObject* DollObject, int32 InPlacedIndex);
+	static bool GetDollPlacedIndex(UObject* DollObject, int32& OutPlacedIndex);
+	static bool MouseOver(UObject* MouseOverObject, EDollStencilValue DollStencilValue);
+	static bool MouseOverEnd(UObject* MouseOverEndObject);
+	static bool FlickDoll(UObject* DollObject, FVector FlickDirection);
+	static bool FlickDoll_Completed(UObject* GameModeObject, UObject* DollOwnerControllerObject);
+	static bool TurnStart(UObject* StartPlayerObject);
+	static bool TurnEnd(UObject* EndPlayerObject);
+	static bool MarkDollAsMoved(UObject* GameModeObject, UObject* DollObject);
+	static bool SetDollStreakSpline(UObject* BoardObject, const TArray<FVector> DollPosArr);
+	static bool SetWinDollCircularEffect(UObject* DollObject, bool bOnEffect);
+	/// <summary>
+	/// Set MID For Circular Effect
+	/// </summary>
+	/// <param name="DollObject">To Change Doll Object</param>
+	/// <param name="fPercent">0 - 1, Off Effect If fPercent Less Than 0</param>
+	/// <returns></returns>
+	static bool SetDollCircularEffect_Progressive(UObject* DollObject, float CurrentTimeSec, float MaxTimeSec);
+	static bool UpdateFallenDollScore(UObject* PlayerControllerObject, int32 FallenDollScore);
+	static bool SetTranclucentDollLocation(UObject* GoBoardObject, FVector TDollLocation);
+	static bool GetTranclucentDoll(UObject* GoBoardObject, UObject*& OutTranclucentDollObject);
+	static bool GetOverlapingDoll_TrancluentDoll(UObject* TranclucentDollObject);
+	UFUNCTION(BlueprintCallable)
+	static bool SetDollFallenFromBoard(UObject* DollObject, bool bFallen);
+	/*Promote Player To Host Set Nullptr To Demote*/
+	static bool SetHostingSessionCreateData(UObject* PlayerControllerObject, const FSessionCreateData& InHostSessionCreateData);
+	static bool GetHostingSessionCreateData(UObject* PlayerStateObject, FSessionCreateData& OutHostSessionCreateData);
+	static bool ClearHostingSessionCreateData(UObject* PlayerControllerObject);
+	static bool GetPossibleCameraLocation(UObject* GoBoardObject, FVector& ToMoveLocation);
+	static bool AlertDollBoardStationary(UObject* DollObejct);
+
+	static bool AIPlay_SpawnDollAtLocation(UObject* GameModeObject, UObject* NextPlayerObject, FVector PlaceLocation);
+	static bool AIPlay_FlickDoll(UObject* GameModeObject, UObject* NextPlayerObject, UObject* FlickDollObject, FVector FlickDirection);
+	static bool AIPlay_ThrowLoadingScreen(UObject* PlayerObject, bool bEnable);
+	static bool AIPlay_ConsiderTurnPassed(UObject* PlayerObject);
+
+	static bool AddFallenScore(UObject* GameModeObject, UObject* FallenDollObject);
+	static bool AddRealtimeCooldownBonus(UObject* PlayerControllerObject, float CooldownBonusPortion, bool bFlick = false);
+	static bool SetOminousHUDPercent(UObject* PlayerControllerObject, float CurrentTimeSec, float MaxTimeSec);
+
+	static bool StartGameTimer(UObject* PlayerControllerObject, double InStartTimeStamp, double InTimeLimit);
+	static bool ThrowScoringBoard(UObject* PlayerControllerObject, const TArray<FScoreBoard>& ScoreArr);
+	static bool UpdateScoringBoard(UObject* PlayerControllerObject, uint8 DollColor, EScoreType ScoreType, int32 UpdatedScore);
+	static bool GetDollHP(UObject* DollObject, float& OutHP);
+	static bool SetDollStencil_Scoring(UObject* DollObject);
+
+	static bool GetNextDollType(UObject* GameModeObject, EDollType& OutNextDollType);
+	static bool SendCurrentSessionData(UObject* PlayerControllerObject, const FSessionCreateData& InSessionCreateData);
+
+	static bool GetPlacedDollCount(UObject* GameModeObject, int32& OutDollCount);
+
+	static bool SetTurnMode_CylinderConfig(UObject* PlayerControllerObject, const TArray<EDollType>& InItemDollArr);
+
+	static bool SetMatchScoreLampState(UObject* PlayerControllerObject, int32 Index, EMatchScoreLampState InMatchScoreLampState, uint8 FillDollColor);
+	static bool ResetMatchScoreLampState(UObject* PlayerControllerObject);
+	static bool SetMatchScoreLampCount(UObject* PlayerControllerObject, int32 MaxCount);
+
+// Server Function;
+	static bool HostGame(UObject* HostPlayerObject, const FUniqueNetIdRepl& UniqueNetIdRepl, FSessionCreateData& SessionCreateData);
+	static bool RequestHostGame(UObject* GameInstanceObject, const FUniqueNetIdRepl& UniqueNetIdRepl, const FSessionCreateData& SessionCreateData);
+	static bool RefreshOnlineSessions(UObject* JoinPlayerControllerObject);
+	static bool FindSession(UObject* GameInstanceObject, const FUniqueNetIdRepl& UniqueNetIdRepl);
+	static bool JoinSelectedSession(UObject* PlayerObject, UObject* SelectedOnlineSessionData, const FUniqueNetIdRepl& UniqueNetIdRepl);
+	static bool StartGame(UObject* PlayerObject);
+	static bool StartGameIfAllReady(UObject* GameModeObejct, const FSessionCreateData& SessionCreateData);
+	static bool ReadyGame(UObject* PlayerObject);
+	static bool LeaveGame(UObject* PlayerObject);
+	static bool Steam_CreateSession(UObject* PlayerObject);
+	static bool SetReadyState(UObject* PlayerStateObject, bool bReady);
+
+	static bool GetPlayerCard(UObject* PlayerStateObject, FPlayerCard& OutPlayerCard);
+	static bool SetPlayerCard(UObject* PlayerStateObject, FPlayerCard& InPlayerCard);
+	//static bool StartHotSeatGame(UObject* PlayerObject, EPlayGameRule PlayGameRule);
+	static bool StartHotSeatGame(UObject* PlayerObject, const FSessionCreateData& SessionCreateData);
+	//static bool StartSingleAIGame(UObject* PlayerObject, EPlayGameRule PlayGameRule, int32 PlayAsDollColor);
+	static bool StartSingleAIGame(UObject* PlayerObject, const FSessionCreateData& SessionCreateData);
+	static bool SetDollColor(UObject* PlayerObject, uint8 DollColor);
+
+	static bool ClientLoadingCompleted(UObject* PlayerControllerObject, UObject* GameModeObject);
+	static bool RefreshPlayerCardListView(UObject* PlayerControllerObject);
+	static bool RefreshAllPlayerCardListView(UObject* GameModeObject);
+	/*Refresh Every PlayerCard ListView Except The Given PlayerController*/
+	static bool RefreshAllPlayerCardListView_Except(UObject* GameModeObject, UObject* ExceptPlayerControllerObject);
+	static bool PlayerWin_HotSeat(UObject* PlayerObject, uint8 InDollColor);
+	static bool PlayerWin(UObject* PlayerObject);
+	static bool PlayerLose(UObject* PlayerObject);
+	static bool PlayerDraw(UObject* PlayerObject);
+	static bool PlayerGiveUp(UObject* PlayerObject);
+	static bool PlayerWalkOver(UObject* GameModeObject, UObject* GaveUpPlayerObject);
+	static bool NotifyPlayerTurn(UObject* PlayerControllerObject, const FName& TurnPlayerName);
+	static bool GetCameraObject(UObject* GameModeObject, UObject*& CameraObject);
+
+	static bool SetGlobalTimeDilation(UObject* GameStateObject, float DilationScale);
+	static bool ThrowContinueMatchWidget(UObject* PlayerControllerObject, bool bRespond, const FMatchScoreLampStateConfig& InMatchScoreLampStateConfig);
+	static bool WindupMatchWidget(UObject* PlayerControllerObject, const FMatchScoreLampStateConfig& InMatchScoreLampStateConfig);
+	static bool InstantMatchScoreInMatchWidget(UObject* PlayerControllerObject, const FMatchScoreLampStateConfig& InMatchScoreLampStateConfig);
+	static bool ContinueMatch(UObject* GameModeObject);
+	UFUNCTION(BlueprintCallable)
+	static bool SendChattingMessage(UObject* PlayerControllerObject, const FText& TextMessage);
+	static bool AddChattingMessage(UObject* GameModeObject, const FText& InTextMessage, const FName& InPlayerName);
+	static bool ReceiveChattingMessage(UObject* PlayerControllerObject, const FName& SendPlayerName, const FText& TextMessage);
+	static bool StackChattingMessage(UObject* GameInstanceObject, UObject* ChattingBoxObject);
+
+	// Steam
+	static bool GetSteamID(UObject* GameInstanceObject, int64& OutSteamID);
+	static bool PostSteamID(UObject* GameStateObject, UObject* PlayerControllerObject, int64 RawSteamID);
+	static bool GetSteamAvatar(UObject* GameStateObject, FUniqueNetIdRepl& FindNetID, UObject*& OutAvatarTexture2DObject);
+	static bool RequestSteamAvatar(UObject* GameStateObject, int64 RawSteamID, const FOnSteamAvatarLoaded& OnAvatarLoaded);
+	static bool GetSteamOSSOnline(UObject* GameInstanceObject);
+
+	static bool Steam_InviteFriend(UObject* GameInstanceObject, int64 FriendSteamID);
+	static bool Steam_GetInvitableFriends(UObject* GameInstanceObject, TArray<FSteamFriendData>& InInvitableArr);
+// Server State Changed
+	static bool PlayerJoinedOrCreatedSessionComplete(UObject* PlayerObject, uint64 RawSteamID);
+	static bool PlayerJoinedSessionComplete(UObject* PlayerObject);
+	static bool PlayerCreateSessionComplete(UObject* PlayerObject);
+	static bool OnlineSubsystemLoaded(UObject* PlayerObject);
+	/*Alert All Player via Gamemode*/
+	static bool Notify_PlayerJoinedSessionComplete(UObject* GameModeObject, UObject* JoinedPlayerObject);
+	/*Alert Remaining Players via Gamemode When A Client Left The Session*/
+	static bool Notify_PlayerLeftSession(UObject* GameModeObject, UObject* LeftPlayerObject);
+	static bool GetSessionCreateData_FromSessionInterface(UObject* GameInstanceObject, FSessionCreateData& OutSessionCreateData);
+	static bool SetSessionCreateData_ToGameInstance(UObject* GameInstanceObject, const FSessionCreateData& InSessionCreateData);
+
+// Client Function
+	UFUNCTION(BlueprintCallable)
+	static bool SwitchDollColor(UObject* PlayerControllerObject);
+	static bool ChangePlayerName(UObject* PlayerObject, const FName& NewPlayerName);
+	static bool ChangePlayerDollColor(UObject* PlayerObject, uint8 DollColor);
+	static bool SetMainUIState(UObject* GameInstanceObject, UObject* PlayerControllerObject, const EMainUIState& NewMainUIState);
+	static bool GetMainUIState(UObject* GameInstanceObject, EMainUIState& OutMainUIState);
+	static bool ChangeSessionName(UObject* PlayerControllerObject, const FName& NewSessionName);
+	static bool StartCameraShake(UObject* PlayerControllerObject, float Scale);
+
+	static bool Flicked_InvertCylinderCharge(UObject* GameStateObject, int32 InFlickCylinderInvert);
+	static bool Flicked_InvertCylinderCharge_SetInvertParam(UObject* PlayerControllerObject, int32 InFlickCylinderInvert);
+
+	static bool Flicked_Locking(UObject* PlayerControllerObject, UObject* GameStateObject, bool bLocked);
+	static bool Flicked_Locking_SetBoolParam(UObject* PlayerControllerObject, bool bLocked);
+
+	static bool Placed_NextDollType_Received(UObject* GameStateObject, const EDollType InNextDollType);
+	static bool Placed_NextDollType_Received_SetDollType(UObject* PlayerControllerObject, const EDollType InNextDollType);
+// MainWidget_Settings
+	static bool ApplySavedSettings(UObject* GameInstanceObject);
+	static bool ChangeSettings_MaxFPS(UObject* GameInstanceObject, float NewMaxFPS);
+	static bool ChangeSettings_bUseLowTexture(UObject* GameInstanceObject, bool NewbUseLowTexture);
+	static bool ChangeSettings_fShadowLevel(UObject* GameInstanceObject, float NewfShadowLevel);
+	static bool ChangeSettings_AA(UObject* GameInstanceObject, int32 NewAAType);
+	static bool ChangeSettings_Float(UObject* GameInstanceObject, ESettingConfigParamType SettingConfigParamType, float fNewLevel);
+	static bool ChangeSettings_ScreenResolution(UObject* GameInstanceObject, FIntPoint NewResolution);
+	static bool ChangeSettings_WindowMode(UObject* GameInstanceObject, EWindowMode::Type NewWindowMode);
+	static bool ChangeSettings_Language(UObject* GameInstanceObject, const FString& NewCulture);
+	/*Ask The GameMode To Send Its Hosting Session Config To The Given Player Only*/
+	static bool Request_UpdateTooltip_SessionConfig(UObject* GameModeObject, UObject* PlayerControllerObject);
+	/*Ask The Server(GameMode) To Update Every Player's Tooltip, Standalone Falls Back To Local Only*/
+	static bool Request_UpdateTooltip_SessionConfig_ToAll(UObject* PlayerControllerObject, const FSessionCreateData& InHostSessionCreateData);
+	/*Store The Given Session Config Into The GameMode And Push It To Every Player*/
+	static bool Notify_UpdateTooltip_SessionConfig(UObject* GameModeObject, const FSessionCreateData& InHostSessionCreateData);
+	static bool UpdateTooltip_SessionConfig(UObject* PlayerControllerObject, const FSessionCreateData& HostSessionCreateData);
+	static bool SetHostingSessionCreateData_ToGameMode(UObject* GameModeObject, const FSessionCreateData& InHostSessionCreateData);
+	static bool GetHostingSessionCreateData_FromGameMode(UObject* GameModeObject, FSessionCreateData& OutHostSessionCreateData);
+	static bool GetHostingSessionCreateData_FromGameInstance(UObject* GameInstanceObject, FSessionCreateData& OutHostSessionCreateData);
+// Widget Thingy
+	//static bool GetMainWidgetAsObject(UObject* PlayerControllerObject, UObject*& OutMainWidget);
+	static bool ChangeWidgetSelected(UObject* WidgetObjecct, bool bSelected);
+// Client Function
+	static bool GetPlayGameMode(UObject* PlayerObject, EPlayGameMode& OutPlayGameMode);
+	static bool SetPlayGameMode(UObject* PlayerObject, EPlayGameMode InPlayGameMode);
+	static bool EndProcess(UObject* PlayerControllerObject);
+
+	static bool ThrowTemporalMessage(UObject* PlayerControllerObject, const FString& ThrowMessage, ETemporalMessageType TemporalMessageType);
+	static bool SetCameraPosition(UObject* PlayerControllerObject, ECameraPosition CameraPosition);
+	static bool CloseInGameSettingsWidget(UObject* PlayerControllerObject);
+
+	static bool ClientTravel_UILoaded(UObject* PlayerControllerObject, EMainUIState SucceededUIState, const FString& URL, enum ETravelType TravelType, bool bSeamless = false);
+	static bool MarkUIState_ClientTravelCallback(UObject* GameInstanceObject, EMainUIState SucceededUIState, EMainUIState FailededUIState);
+	static bool GetClientTravelCallbackUIState(UObject* GameInstanceObject, EMainUIState& OutSucceededUIState, EMainUIState& OutFailededUIState);
+
+// Session Loading UI
+	static bool SetSessionLoadingScreen(UObject* PlayerControllerObject, bool bEnable, ESessionLoadingPhase LoadingPhase);
+	static bool MarkSessionLoadingPhase(UObject* GameInstanceObject, ESessionLoadingPhase LoadingPhase);
+	static bool GetSessionLoadingPhase(UObject* GameInstanceObject, ESessionLoadingPhase& OutLoadingPhase);
+
+	static bool SetPlayerSessionHost(UObject* GameInstanceObject, bool e);
+	static bool GetPlayerSessionHost(UObject* GameInstanceObject, bool& OutIsHost);
+	//static bool Steam_GetSteamAvatar(UObject* GameInstance, UObject*& SteamAvatarObjectPtr);
+// Delegate Function
+	static bool BindDelegate_Widget(UObject* BindObject, UObject* WidgetObject);
+
+// Debug Function
+	static bool OpenLocalHost(UObject* PlayerControllerObject);
+	static bool JoinLocalHost(UObject* PlayerControllerObject);
+	static bool StartLocalHostGame(UObject* GameModeObject, const FSessionCreateData& SessionCreateData);
+	static bool GetPlayerName(UObject* PlayerStateObject, FName& OutPlayerName);
+	static bool GetOnlineIdentityPlayerNickName(UObject* GameInstanceObject, FString& OutPlayerName);
+
+// Tool
+	static EDollType ConvertIntToDollType(int32 In);
+private:
+// Debug Function
+	static bool NullCheck(UObject* CheckObject, FName ObjectName = NAME_None, FName FuncName = NAME_None);
+	static ECameraPosition UIStateToCamPosition(EMainUIState MainUIState);
+};
+```
+
+**GoSoccerPlayManager.cpp 일부분*
+
+```cpp
+#include "GoSoccerPlayManager.h"
+#include "Interface/IGoBoard.h"
+#include "Interface/IGoHUD.h"
+#include "Interface/IGoDoll.h"
+#include "Interface/IGoSoccerPlayerController.h"
+#include "Interface/IGoSoccerPlayerState.h"
+#include "Interface/IGoSoccerPlayMode.h"
+#include "Interface/IGoSoccerGameInstance.h"
+#include "Interface/IGoSoccerGameState.h"
+#include "Interface/IGoWidget.h"
+```
+</details>
+
 각 클래스는 인터페이스에 BlueprintNativeEvent 매크로를 추가하여 Execute_foo 형태로 호출이 가능하도록 구현하였습니다.
+
+<details>
+<summary>static 함수 구현 예시</summary>
+
+**해당 함수는 MainWidget 클래스에서 PlayerController를 UOjbect 파라미터로 전달, 컨트롤러에서 UniqueNetId를 얻은 뒤 GameInstance를 UObject로 전달하여 최종적으로 세션에 접속을 시도합니다.*
+```cpp
+bool UGoSoccerPlayManager::JoinSelectedSession(UObject* PlayerObject, UObject* SelectedOnlineSessionData, const FUniqueNetIdRepl& UniqueNetIdRepl)
+{
+	if (!NullCheck(PlayerObject, TEXT("PlayerObject"), TEXT("JoinSelectedSession"))) return false;
+	if (!NullCheck(SelectedOnlineSessionData, TEXT("SelectedOnlineSessionData"), TEXT("JoinSelectedSession"))) return false;
+	if (PlayerObject->Implements<UIGoSoccerPlayerController>())
+	{
+		return IIGoSoccerPlayerController::Execute_JoinSelectedSession(PlayerObject, SelectedOnlineSessionData);
+	}
+	else if (PlayerObject->Implements<UIGoSoccerGameInstance>())
+	{
+		return IIGoSoccerGameInstance::Execute_JoinSelectedSession(PlayerObject, SelectedOnlineSessionData, UniqueNetIdRepl);
+	}
+	return false;
+}
+```
+
+</details>
 
 GoSoccerPlayManager는 특정 객체의 함수 호출 시, 해당 객체를 UObject로 캐스팅하여 전달받고, 인터페이스에 선언되어 있는 함수를 Execute_foo(UOBject* O) 형식으로 호출합니다.
 
-이전 프로젝트에서 각 클래스별 의존성과 프로젝트가 커짐에 따라 컴파일 시간이 증가함(특정 클래스를 include하는 타 클래스까지 컴파일을 진행함)을 확인하고 해당 구조를 선택하였습니다.
+이전의 프로젝트들에서 각 클래스별 의존성과 프로젝트가 커짐에 따라 컴파일 시간이 증가함(특정 클래스를 include하는 타 클래스까지 컴파일을 진행함)을 확인하고 해당 구조를 선택하였습니다.
