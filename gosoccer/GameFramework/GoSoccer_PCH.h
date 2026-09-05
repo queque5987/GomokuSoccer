@@ -26,8 +26,8 @@ DECLARE_DELEGATE_TwoParams(FOnWidgetSelected, UObject* /*SelectedWidgetItSelf*/,
 DECLARE_DELEGATE_TwoParams(FOnSetOminousHUDPercent, float /*Current Time Sec*/, float /*Max Time Sec*/);
 DECLARE_DELEGATE_OneParam(FOnAddRealtimeColldownBonus, float /*CoolDown Bonus Portion(Max Cooldown)*/);
 
-/** Steam 아바타 로드 완료 콜백. UFUNCTION 파라미터로 넘겨야 해서 Dynamic 으로 선언한다. */
 DECLARE_DYNAMIC_DELEGATE_OneParam(FOnSteamAvatarLoaded, UObject*, AvatarTexture2DObject);
+DECLARE_DYNAMIC_DELEGATE(FOnMatchScoreWidgetEnd);
 
 constexpr float HIT_COOLDOWN_ADVANTAGE = 0.1f;
 
@@ -494,8 +494,8 @@ public:
 	bool bEnableItem = false;
 
 	/*AI Mode Only, Not Available For Now*/
-	UPROPERTY(BlueprintReadOnly)
-	int32 PlayAsDollColor = -1;
+	//UPROPERTY(BlueprintReadOnly)
+	//int32 PlayAsDollColor = -1;
 
 	/**
 	 * 실제 세션 설정이 채워진 값인지. (기본 생성 상태와 구분하는 용도)

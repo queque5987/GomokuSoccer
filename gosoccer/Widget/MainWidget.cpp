@@ -141,7 +141,7 @@ void UMainWidget::OnGameConfigSettingCompleted()
 	}
 	else if (SessionCreateData.PlayGameMode == EPlayGameMode::EPGM_SingleAIPlay)
 	{
-		int32 PlayAs = SessionCreateData.PlayAsDollColor;
+		//int32 PlayAs = SessionCreateData.PlayAsDollColor;
 		UGoSoccerPlayManager::StartSingleAIGame(PC, SessionCreateData);
 		UGoSoccerPlayManager::SetPlayGameMode(GetGameInstance(), EPlayGameMode::EPGM_SingleAIPlay);
 		UGoSoccerPlayManager::SetMainUIState(GetGameInstance(), PC, EMainUIState::EMUIS_GameStarted);

@@ -390,7 +390,8 @@ bool AGoSoccerPlayMode::HostSingleAIGame_Implementation(const FSessionCreateData
 	PlayGameMode = EPlayGameMode::EPGM_SingleAIPlay;
 	PlayingGameRule = SessionCreateData.PlayGameRule;
 	AIPlayingTurn = false;
-	AIGame_PlayerDollColor = (uint8)SessionCreateData.PlayAsDollColor;
+	//AIGame_PlayerDollColor = (uint8)SessionCreateData.PlayAsDollColor;
+	AIGame_PlayerDollColor = 0;
 	return true;
 }
 

@@ -92,12 +92,12 @@ void AGoPlayerController::OnFindSessionComplete(bool bWasSuccessful)
 				*SessionName);
 			GEngine->AddOnScreenDebugMessage(-1, 3.f, Result.IsValid() ? FColor::Green : FColor::Red, LogString);
 		}
+#endif
 		if (Widget_Main)
 		{
 			Widget_Main->AddOnlineSessionSearchResult(Result);
 			//Widget_Main->Debug_AddSessionName(SessionName);
 		}
-#endif
 	}
 
 }

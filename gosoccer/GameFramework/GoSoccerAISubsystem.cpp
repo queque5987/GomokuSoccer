@@ -107,7 +107,7 @@ void UGoSoccerAISubsystem::Request_Calculate(
     );
     double AIPlayCalculate_Time = FPlatformTime::Seconds();
     UE_LOG(LogTemp, Log, TEXT("4/4 - BackGround Threads - Took : %.2f ms"), (AIPlayCalculate_Time - UnionBoard_Time) * 1000.f);
-#if UE_BUILD_SHIPPING
+#if !UE_BUILD_SHIPPING
 	//Debug_GetPossibleSpawnDollLocation(true);
 #endif
     double EndTime = FPlatformTime::Seconds();

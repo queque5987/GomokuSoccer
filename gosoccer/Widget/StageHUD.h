@@ -130,7 +130,7 @@ public:
 	UFUNCTION(BlueprintImplementableEvent)
 	void ThrowContinueMatch(float ThrowingTimeSec);
 	UFUNCTION(BlueprintImplementableEvent)
-	void WindupMatchWidget(const FMatchScoreLampStateConfig& InMatchScoreLampStateConfig);
+	void WindupMatchWidget(const FMatchScoreLampStateConfig& InMatchScoreLampStateConfig, const FOnMatchScoreWidgetEnd& OnMatchScoreWidgetEnd);
 private:
 	void CheckTemporalMessageIter();
 	FTimerManager* GetTimerManager_HUD();
