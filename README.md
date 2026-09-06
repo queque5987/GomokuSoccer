@@ -26,7 +26,7 @@ Steam 정식 출시를 목표로 개발 중인 1인 프로젝트입니다.
 * [**Debug_Release_0907.zip**](https://github.com/queque5987/GomokuSoccer/releases/download/Debug/debug_0907.zip)
 
 
-# 사용한 기술
+# 사용한 주요 기술
 
 ## [**1. Steam OSS 기반 P2P 멀티플레이 구현**](#A-steam-oss-기반-p2p-멀티플레이-구현)
 * **Steamworks SDK** : 플레이어간 세션 생성, 검색, 참여 기능을 구현하였습니다.
