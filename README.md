@@ -9,12 +9,22 @@ Steam 정식 출시를 목표로 개발 중인 1인 프로젝트입니다.
 
 오목 축구는 오목과 알까기를 접목시킨 멀티플레이 기반 턴제/실시간 보드게임입니다.
 
+
+
+
 # 플레이 영상
 
-[![플레이 영상](https://img.youtube.com/vi/0RZ7-Ixg08Y/0.jpg)](https://youtu.be/0RZ7-Ixg08Y)<br><br>
+[![플레이 영상](https://img.youtube.com/vi/0RZ7-Ixg08Y/0.jpg)](https://youtu.be/0RZ7-Ixg08Y)
 
 
----
+
+
+
+# 패키징
+
+
+* [**Debug_Release_0907.zip**](https://github.com/queque5987/GomokuSoccer/releases/download/Debug/debug_0907.zip)
+
 
 # 사용한 기술
 
